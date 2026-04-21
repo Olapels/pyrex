@@ -32,7 +32,7 @@ services:
 
   #flink cluster
   jobmanager:
-    image: pyflink-workshop
+    image: flink-streaming
     build: .
     ports: ["8081:8081"]
     command: jobmanager
@@ -40,9 +40,13 @@ services:
       - |
         FLINK_PROPERTIES=
         jobmanager.rpc.address: jobmanager
+        s3.endpoint: http://minio:9000
+        s3.access-key: admin
+        s3.secret-key: password
+        s3.path.style.access: true
 
   taskmanager:
-    image: pyflink-workshop
+    image: flink-streaming
     depends_on: [jobmanager]
     command: taskmanager
     environment:
