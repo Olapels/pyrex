@@ -7,7 +7,7 @@ from kafka import KafkaProducer
 set_identity("DataPipelineSupport support@example.com")
 
 producer = KafkaProducer(
-    bootstrap_servers='localhost:9092',
+    bootstrap_servers=['pyrex-redpanda-1:29092'], # Use the service name and INTERNAL port
     value_serializer=lambda v: json.dumps(v).encode('utf-8')
 )
 

@@ -1,15 +1,31 @@
 services:
-  #redpanda.lightweight kakfa server
+  # 1. Redpanda (Lightweight Kafka)
   redpanda:
     image: redpandadata/redpanda:v25.3.9
     command:
-      - redpanda start --smp 1 --reserve-memory 0M --overprovisioned --node-id 1
-      - --kafka-addr PLAINTEXT://0.0.0.0:29092,OUTSIDE://0.0.0.0:9092
-      - --advertise-kafka-addr PLAINTEXT://redpanda:29092,OUTSIDE://localhost:9092
+      - redpanda
+      - start
+      - --smp
+      - '1'
+      - --reserve-memory
+      - 0M
+      - --overprovisioned
+      - --node-id
+      - '1'
+      - --kafka-addr
+      - PLAINTEXT://0.0.0.0:29092,OUTSIDE://0.0.0.0:9092
+      - --advertise-kafka-addr
+      - PLAINTEXT://redpanda:29092,OUTSIDE://localhost:9092
     ports:
-      - 9092:9092
+      - "9092:9092"
+      - "29092:29092"
+    healthcheck:
+      test: ["CMD", "rpk", "cluster", "info"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
-  #Minio. S3 compatible object store
+  # 2. MinIO (S3 Compatible Storage)
   minio:
     image: minio/minio
     ports:
@@ -20,21 +36,26 @@ services:
       MINIO_ROOT_PASSWORD: password
     command: server /data --console-address ":9001"
 
-  #postgres
+  # 3. Postgres (Relational Sink)
   postgres:
     image: postgres:16
     environment:
-      - POSTGRES_DB=sec_analytics
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
+      POSTGRES_DB: sec_analytics
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
     ports:
       - "5432:5432"
 
-  #flink cluster
+  # 4. Flink JobManager
   jobmanager:
-    image: flink-streaming
-    build: .
-    ports: ["8081:8081"]
+    build:
+      context: .
+      dockerfile: Dockerfile.flink
+    image: pyflink-workshop
+    ports:
+      - "8081:8081"
+    volumes:
+      - ./src:/opt/src
     command: jobmanager
     environment:
       - |
@@ -45,12 +66,20 @@ services:
         s3.secret-key: password
         s3.path.style.access: true
 
+  # 5. Flink TaskManager
   taskmanager:
-    image: flink-streaming
-    depends_on: [jobmanager]
+    image: pyflink-workshop
+    depends_on:
+      - jobmanager
+    volumes:
+      - ./src:/opt/src
     command: taskmanager
     environment:
       - |
         FLINK_PROPERTIES=
         jobmanager.rpc.address: jobmanager
         taskmanager.numberOfTaskSlots: 2
+        s3.endpoint: http://minio:9000
+        s3.access-key: admin
+        s3.secret-key: password
+        s3.path.style.access: true
